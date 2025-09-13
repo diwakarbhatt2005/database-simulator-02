@@ -3,6 +3,7 @@ import { ValidationError, fetchTableData, validateAndAutoFixData } from '@/api/t
 import { bulkReplaceTableDataApi3, insertTableDataApi3 } from '@/api/api3';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { Button } from '@/components/ui/button';
+import '@/components/ui/custom-table-scroll.css';
 import { sendToWebhook } from '@/api/api4';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -57,6 +58,67 @@ export const DataTable = () => {
   // CSV upload state
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [csvError, setCsvError] = useState<string | null>(null);
+  // Helper: auto-fix value types based on column name
+  function autoFixValue(col: string, val: string) {
+    if (val === undefined || val === null) return '';
+    const v = val.trim();
+    // Special handling for known columns (NEVER treat these as boolean)
+    const colLower = col.toLowerCase();
+    if (colLower === 'date_of_birth') {
+      // Accept DD-MM-YYYY, DD/MM/YYYY, YYYY-MM-DD, YYYY/MM/DD
+      if (/^\d{2}-\d{2}-\d{4}$/.test(v)) {
+        // Convert to YYYY-MM-DD
+        const [d, m, y] = v.split('-');
+        return `${y}-${m}-${d}`;
+      }
+      if (/^\d{2}\/\d{2}\/\d{4}$/.test(v)) {
+        const [d, m, y] = v.split('/');
+        return `${y}-${m}-${d}`;
+      }
+      if (/^\d{4}-\d{2}-\d{2}$/.test(v)) return v;
+      if (/^\d{4}\/\d{2}\/\d{2}$/.test(v)) return v.replace(/\//g, '-');
+      return '';
+    }
+    if (colLower === 'time_of_birth') {
+      // Accept HH:MM or HH:MM:SS
+      if (/^\d{2}:\d{2}$/.test(v)) return v + ':00';
+      if (/^\d{2}:\d{2}:\d{2}$/.test(v)) return v;
+      return '';
+    }
+    if (colLower === 'place_of_birth' || colLower === 'wallet_address_usdt') {
+      return v;
+    }
+    // Boolean columns: only if name starts with is_, has_, or is exactly true/false/active/disabled/locked/blocked/flag/status/verified/kyc
+    // But skip if colLower matches any of the above special columns
+    if (!['date_of_birth','time_of_birth','place_of_birth','wallet_address_usdt'].includes(colLower) &&
+      (/^(is_|has_)/i.test(col) || /^(active|enabled|disabled|flag|status|verified|kyc|blocked|locked|boolean)$/i.test(colLower))) {
+      if (v === '1' || v.toLowerCase() === 'true' || v.toLowerCase() === 'yes') return true;
+      if (v === '0' || v.toLowerCase() === 'false' || v.toLowerCase() === 'no') return false;
+      return false; // fallback
+    }
+    // Integer columns (by name pattern)
+    if (/(balance|count|number|total|volume|amount|id|index|qty|quantity|score|integer)$/i.test(col)) {
+      const n = parseInt(v, 10);
+      return isNaN(n) ? 0 : n;
+    }
+    // Date columns (generic)
+    if (/date/i.test(col)) {
+      if (v.toLowerCase() === 'null' || v === '') return '';
+      if (/^\d{4}-\d{2}-\d{2}$/.test(v)) return v;
+      if (/^\d{4}\/\d{2}\/\d{2}$/.test(v)) return v.replace(/\//g, '-');
+      return '';
+    }
+    // Time columns (generic)
+    if (/time/i.test(col)) {
+      if (v.toLowerCase() === 'null' || v === '') return '';
+      if (/^\d{2}:\d{2}:\d{2}$/.test(v)) return v;
+      if (/^\d{2}:\d{2}$/.test(v)) return v + ':00';
+      return '';
+    }
+    // Default: return as string
+    return v;
+  }
+
   // CSV upload handler
   const handleCsvUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     setCsvError(null);
@@ -80,7 +142,7 @@ export const DataTable = () => {
         const cells = line.split(',');
         const rowObj: Record<string, any> = {};
         headers.forEach((h, i) => {
-          rowObj[h] = cells[i] || '';
+          rowObj[h] = autoFixValue(h, cells[i] || '');
         });
         // Fill missing columns with ''
         columns.forEach(col => {
@@ -207,8 +269,6 @@ export const DataTable = () => {
 
   const handlePaste = useCallback((e: React.ClipboardEvent, rowIndex: number, field: string) => {
     e.preventDefault();
-    
-    // Ensure we're working with the current selected table
     if (!selectedDatabase) {
       toast({
         title: "Paste Error",
@@ -217,12 +277,33 @@ export const DataTable = () => {
       });
       return;
     }
-    
     const pastedData = e.clipboardData.getData('text');
-    
-  // Support both tab and comma separated data
-  const rows = pastedData.split('\n').filter(row => row.trim());
-    
+    // Only handle single-line or multi-cell paste into a single cell of a new row
+    const isSingleRowPaste = !pastedData.includes('\n');
+    const hasTab = pastedData.includes('\t');
+    const startFieldIndex = columns.indexOf(field);
+    if (rowIndex === 0) { // Only allow smart paste for the top (new) row
+      let cells: string[] = [];
+      if (hasTab) {
+        cells = parseRow(pastedData, '\t').map(cell => cell.replace(/^"|"$/g, ''));
+      } else {
+        cells = parseRow(pastedData, ',').map(cell => cell.replace(/^"|"$/g, ''));
+      }
+      cells.forEach((cell, cellIndex) => {
+        const fieldIndex = startFieldIndex + cellIndex;
+        const currentField = columns[fieldIndex];
+        if (currentField) {
+          updateCell(rowIndex, currentField, autoFixValue(currentField, cell));
+        }
+      });
+      toast({
+        title: "Smart Paste",
+        description: `Pasted ${cells.length} cells into the new row.`
+      });
+      return;
+    }
+    // Fallback: default paste for other rows (single cell only)
+    const rows = pastedData.split('\n').filter(row => row.trim());
     if (rows.length === 0) {
       toast({
         title: "Paste Error",
@@ -231,107 +312,12 @@ export const DataTable = () => {
       });
       return;
     }
-    
-  // Validate and detect delimiter preference: prefer tabs (Excel/Sheets).
-  const hasTab = pastedData.includes('\t');
-  const sampleRow = rows[0];
-  const delimiterGuess = hasTab ? '\t' : ',';
-
-  // use shared parseRow above
-    
-    // Paste behavior depends on mode:
-    // - insert: only allow pasting into new rows (preserve existing insert flow)
-    // - update: allow pasting into existing rows (but do not change primary key)
-    if (mode !== 'update' && rowIndex < originalDataLength) {
-      toast({
-        title: "Paste Not Allowed",
-        description: "You can only paste data in new rows while in Insert mode.",
-        variant: "destructive",
-      });
-      return;
-    }
-    
-    // Calculate how many new rows we need
-    const neededRows = Math.max(0, (rowIndex + rows.length) - tableData.length);
-    
-    // Add required rows all at once
-    if (neededRows > 0) {
-      addMultipleRows(neededRows);
-    }
-    
-    // Use setTimeout to ensure rows are added before updating cells
-    setTimeout(() => {
-      let pastedCells = 0;
-      let truncatedCells = 0;
-      const startFieldIndex = columns.indexOf(field);
-
-      rows.forEach((row, rowOffset) => {
-        // Choose parsing strategy per row: prefer tabs; only split on commas
-        // if parsed fields fit within available columns. If parsed CSV
-        // produces more tokens than available columns, try to merge the
-        // extra tokens into a likely "address-like" column so address
-        // fragments containing commas stay together.
-        let cells: string[] = [];
-        if (hasTab) {
-          cells = parseRow(row, '\t').map(cell => cell.replace(/^"|"$/g, ''));
-        } else {
-          const csvParsed = parseRow(row, ',').map(cell => cell.replace(/^"|"$/g, ''));
-          const neededCols = columns.length - startFieldIndex;
-          if (csvParsed.length === neededCols) {
-            cells = csvParsed;
-          } else if (csvParsed.length < neededCols) {
-            // not enough tokens: place tokens and pad
-            cells = [...csvParsed];
-          } else {
-            // too many tokens: find address-like column to absorb extras
-            const primaryAddr = findPrimaryAddressIndex(columns);
-            const mergeIndex = (primaryAddr >= startFieldIndex && primaryAddr < startFieldIndex + neededCols)
-              ? primaryAddr
-              : startFieldIndex;
-
-            const mapped: string[] = [];
-            let p = 0;
-            const endIdx = startFieldIndex + neededCols - 1;
-            for (let colIdx = startFieldIndex; colIdx <= endIdx; colIdx++) {
-              if (colIdx < mergeIndex) {
-                mapped.push(csvParsed[p++] || '');
-              } else if (colIdx === mergeIndex) {
-                const remainingColsAfter = endIdx - colIdx;
-                const tokensForThis = Math.max(1, csvParsed.length - p - remainingColsAfter);
-                const val = csvParsed.slice(p, p + tokensForThis).join(', ').trim();
-                mapped.push(val);
-                p += tokensForThis;
-              } else {
-                mapped.push(csvParsed[p++] || '');
-              }
-            }
-            cells = mapped;
-          }
-        }
-        const currentRowIndex = rowIndex + rowOffset;
-        
-        cells.forEach((cell, cellIndex) => {
-          const fieldIndex = startFieldIndex + cellIndex;
-          const currentField = columns[fieldIndex];
-          if (currentField && currentRowIndex < tableData.length + neededRows) {
-            // In update mode, never modify the primary key (first column)
-            if (mode === 'update' && currentField === columns[0]) {
-              // skip primary key updates
-            } else {
-              updateCell(currentRowIndex, currentField, cell);
-              pastedCells++;
-            }
-          } else if (!currentField) {
-            truncatedCells++;
-          }
-        });
-      });
-      
-      toast({
-        title: "Data Pasted Successfully",
-        description: `Pasted ${pastedCells} cells across ${rows.length} rows.${truncatedCells > 0 ? ` ${truncatedCells} cells were truncated.` : ''}`,
-      });
-    }, 200);
+    // Only update the current cell for other rows
+    updateCell(rowIndex, field, autoFixValue(field, rows[0]));
+    toast({
+      title: "Paste",
+      description: `Pasted value into cell.`
+    });
   }, [columns, tableData, updateCell, addMultipleRows, toast]);
 
   // Store original data length to block edit/delete (set only once after first data load)
@@ -387,8 +373,9 @@ export const DataTable = () => {
           console.warn('Could not refresh data after insert:', refreshError);
         }
         toast({
-          title: 'Success',
-          description: `${newRows.length} rows inserted successfully with auto-fix applied!`,
+          title: 'New Record(s) Added!',
+          description: `${newRows.length} record${newRows.length > 1 ? 's' : ''} inserted successfully!`,
+          variant: 'default',
         });
       } else if (mode === 'update') {
         // Defensive: block if PK column is not present
@@ -469,8 +456,9 @@ export const DataTable = () => {
           console.warn('Could not refresh data after update:', refreshError);
         }
         toast({
-          title: 'Success',
-          description: `${updatesToSend.length} row(s) updated successfully!`,
+          title: 'Record(s) Updated!',
+          description: `${updatesToSend.length} record${updatesToSend.length > 1 ? 's' : ''} updated successfully!`,
+          variant: 'default',
         });
       }
     } catch (err: any) {
@@ -528,6 +516,24 @@ export const DataTable = () => {
     setBulkPasteValue('');
     setBulkPasteError('');
     setBulkModalOpen(true);
+
+  // Helper to add a row at the top (just below header)
+  };
+
+  // Add Row at Top (just below header)
+  const handleAddRowAtTop = () => {
+  // Create a blank row with all columns as ''
+  const blankRow: Record<string, any> = {};
+  columns.forEach(col => { blankRow[col] = ''; });
+  // Insert at index 0 (after header)
+  // If originalDataLength > 0, insert after original rows so it's always editable
+  const origLen = originalDataLength || 0;
+  const before = tableData.slice(0, origLen);
+  const after = tableData.slice(origLen);
+  setTableData([...before, blankRow, ...after]);
+  setEditMode(true);
+  setMode('insert');
+  toast({ title: 'Row Added', description: 'A new row was added at the top.' });
   };
 
   const handleBulkPaste = () => {
@@ -578,7 +584,7 @@ export const DataTable = () => {
       }
       const rowObj = {} as Record<string, any>;
       columns.forEach((col, i) => {
-        rowObj[col] = cells[i] || '';
+        rowObj[col] = autoFixValue(col, cells[i] || '');
       });
       return rowObj;
     });
@@ -610,28 +616,41 @@ export const DataTable = () => {
 
   // Month selector and calculation button at the top
   const [selectedMonth, setSelectedMonth] = useState('');
-  const handleMonthCalc = () => {
-    // Add your calculation logic here
-    toast({ title: 'Month Calculation', description: `Calculation for ${selectedMonth || 'selected month'}` });
+  const [selectedMonthName, setSelectedMonthName] = useState('');
+  const [selectedYear, setSelectedYear] = useState('');
+  const monthOptions = [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December'
+  ];
+  const handleMonthEndCalc = () => {
+    toast({ title: 'Month End Calculation', description: `Calculation for ${selectedMonthName} ${selectedYear}` });
   };
 
   return (
     <div className="space-y-6">
-      {/* Top controls: Month selector and calculation button */}
-      <div className="flex items-center space-x-2 mb-2">
+      {/* Only calculation controls at the top, with placeholders and no default values */}
+      <div className="flex items-center gap-2 mb-2">
+        <select
+          value={selectedMonthName}
+          onChange={e => setSelectedMonthName(e.target.value)}
+          className="h-8 text-xs md:text-sm border rounded px-2 text-gray-500"
+        >
+          <option value="" disabled hidden>Select Month</option>
+          {monthOptions.map(m => <option key={m} value={m}>{m}</option>)}
+        </select>
         <Input
-          type="month"
-          value={selectedMonth}
-          onChange={e => setSelectedMonth(e.target.value)}
-          className="h-8 text-xs md:text-sm"
-          style={{ width: 140 }}
+          type="text"
+          value={selectedYear}
+          onChange={e => setSelectedYear(e.target.value.replace(/[^0-9]/g, '').slice(0, 4))}
+          className="h-8 text-xs md:text-sm w-20"
+          placeholder="Enter Year"
         />
         <Button
           variant="outline"
-          className="border-info text-info hover:bg-info hover:text-white transition-smooth"
-          onClick={handleMonthCalc}
+          className="border-info text-info hover:bg-info hover:text-white transition-smooth ml-2"
+          onClick={handleMonthEndCalc}
         >
-          Calculate Month Data
+          Calculate Month End Data
         </Button>
       </div>
       {/* Header */}
@@ -714,7 +733,7 @@ export const DataTable = () => {
           <CardContent className="pt-6">
             <div className="flex items-center space-x-2 flex-wrap">
               <Button
-                onClick={addRow}
+                onClick={handleAddRowAtTop}
                 variant="outline"
                 className="border-accent text-accent hover:bg-accent hover:text-white transition-smooth"
               >
@@ -784,8 +803,23 @@ export const DataTable = () => {
       {/* Data Table */}
   <Card className="bg-gradient-card shadow-card border-0">
         <CardContent className="p-0">
-          <div className="overflow-x-auto max-h-[70vh] relative">
-            <table className="min-w-max w-full border-separate border-spacing-0 text-xs md:text-sm">
+          <div
+            className="relative custom-table-scroll px-4 py-3"
+            style={{
+              maxWidth: '1100px',
+              maxHeight: '520px',
+              minWidth: '700px',
+              minHeight: '320px',
+              overflowX: 'auto',
+              overflowY: 'auto',
+              borderRadius: '10px',
+              border: '1px solid #e5e7eb',
+              boxShadow: '0 2px 8px 0 rgba(0,0,0,0.04)',
+              background: 'white',
+              margin: '0 auto',
+            }}
+          >
+            <table className="min-w-max w-full border-separate border-spacing-0 text-xs md:text-sm" style={{ tableLayout: 'fixed' }}>
               <thead className="sticky top-0 bg-table-header text-white z-10 shadow-md">
                 <tr>
                   {isEditMode && (
@@ -893,6 +927,7 @@ export const DataTable = () => {
                                 className="border-input focus:border-primary transition-smooth text-xs md:text-sm"
                                 placeholder={`Enter ${column}`}
                                 title={`Paste data here to auto-fill multiple cells. Row ${rowIndex + 1}, Column: ${column}`}
+                                autoFocus={false}
                               />
                             )
                           )
@@ -920,34 +955,6 @@ export const DataTable = () => {
       </Card>
     {/* ...existing code... */}
 
-    {/* Chatbot Assistant UI */}
-    <Card className="mt-6 bg-gradient-card shadow-card border-0">
-      <CardHeader>
-        <CardTitle className="text-lg font-bold">Chatbot Assistant</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="flex flex-col md:flex-row items-stretch gap-2">
-          <Input
-            ref={chatInputRef}
-            value={chatInput}
-            onChange={e => setChatInput(e.target.value)}
-            placeholder="Ask a question..."
-            className="flex-1"
-            disabled={chatLoading}
-            onKeyDown={e => { if (e.key === 'Enter') handleAskChatbot(); }}
-          />
-          <Button onClick={handleAskChatbot} disabled={chatLoading || !chatInput.trim()}>
-            {chatLoading ? "Asking..." : "Ask"}
-          </Button>
-        </div>
-        {chatError && <div className="text-red-500 mt-2">{chatError}</div>}
-        {chatResponse && (
-          <div className="mt-3 p-3 rounded bg-muted text-foreground border">
-            <strong>Response:</strong> {chatResponse}
-          </div>
-        )}
-      </CardContent>
-    </Card>
   </div>
   );
 };
