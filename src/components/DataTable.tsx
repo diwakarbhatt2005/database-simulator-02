@@ -806,27 +806,25 @@ export const DataTable = () => {
           <div
             className="relative custom-table-scroll px-4 py-3"
             style={{
-              maxWidth: '1100px',
-              maxHeight: '520px',
-              minWidth: '700px',
-              minHeight: '320px',
+              width: '100%',
+              maxHeight: '600px',
+              minHeight: '400px',
               overflowX: 'auto',
               overflowY: 'auto',
               borderRadius: '10px',
               border: '1px solid #e5e7eb',
               boxShadow: '0 2px 8px 0 rgba(0,0,0,0.04)',
               background: 'white',
-              margin: '0 auto',
             }}
           >
-            <table className="min-w-max w-full border-separate border-spacing-0 text-xs md:text-sm" style={{ tableLayout: 'fixed' }}>
+            <table className="w-full border-separate border-spacing-0 text-xs md:text-sm" style={{ minWidth: '800px' }}>
               <thead className="sticky top-0 bg-table-header text-white z-10 shadow-md">
                 <tr>
                   {isEditMode && (
-                    <th className="px-2 py-1 md:px-3 md:py-2 text-left font-medium bg-table-header sticky left-0 z-20 border-b border-table-border">Actions</th>
+                    <th className="px-2 py-1 md:px-3 md:py-2 text-left font-medium bg-table-header sticky left-0 z-20 border-b border-table-border min-w-[100px]">Actions</th>
                   )}
                   {columns.map((column, index) => (
-                    <th key={column} className={`px-2 py-1 md:px-3 md:py-2 text-left font-medium min-w-[120px] md:min-w-[150px] bg-table-header border-b border-table-border ${index === 0 && !isEditMode ? 'sticky left-0 z-20' : ''}`}>
+                    <th key={column} className={`px-2 py-1 md:px-3 md:py-2 text-left font-medium min-w-[150px] bg-table-header border-b border-table-border ${index === 0 && !isEditMode ? 'sticky left-0 z-20' : ''}`}>
                       {isEditMode ? (
                         <div className="flex items-center space-x-2">
                           {editingColumn === column ? (
@@ -890,7 +888,7 @@ export const DataTable = () => {
                             onClick={() => deleteRow(rowIndex)}
                             size="sm"
                             variant="outline"
-                            className="border-destructive text-destructive hover:bg-destructive hover:text-white transition-smooth"
+                            className="border-destructive text-destructive hover:bg-destructive hover:text-white transition-smooth h-8 w-8 p-0"
                           >
                             <Trash2 className="w-3 h-3" />
                           </Button>
@@ -898,7 +896,7 @@ export const DataTable = () => {
                       </td>
                     )}
                     {columns.map((column, colIndex) => (
-                      <td key={`${rowIndex}-${column}`} className={`px-2 py-1 md:px-3 md:py-2 border-r border-table-border ${colIndex === 0 && !isEditMode ? 'sticky left-0 bg-background z-15' : ''}`}>
+                      <td key={`${rowIndex}-${column}`} className={`px-2 py-1 md:px-3 md:py-2 border-r border-table-border min-w-[150px] ${colIndex === 0 && !isEditMode ? 'sticky left-0 bg-background z-15' : ''}`}>
                         {isEditMode ? (
                           // In Update mode, prevent editing the first column (primary key)
                           columns[0] === column && mode === 'update' ? (
@@ -906,7 +904,7 @@ export const DataTable = () => {
                               value={row[column] || ''}
                               readOnly
                               disabled
-                              className="border-input bg-gray-100 text-xs md:text-sm"
+                              className="border-input bg-gray-100 text-xs md:text-sm h-8"
                               title={`Primary key is locked in Update mode`}
                             />
                           ) : (
@@ -916,7 +914,7 @@ export const DataTable = () => {
                                 value={row[column] || ''}
                                 readOnly
                                 disabled
-                                className="border-input bg-gray-100 text-xs md:text-sm"
+                                className="border-input bg-gray-100 text-xs md:text-sm h-8"
                                 title={`Original rows are locked while adding new rows`}
                               />
                             ) : (
@@ -924,7 +922,7 @@ export const DataTable = () => {
                                 value={row[column] || ''}
                                 onChange={(e) => handleCellChange(rowIndex, column, e.target.value)}
                                 onPaste={(e) => handlePaste(e, rowIndex, column)}
-                                className="border-input focus:border-primary transition-smooth text-xs md:text-sm"
+                                className="border-input focus:border-primary transition-smooth text-xs md:text-sm h-8"
                                 placeholder={`Enter ${column}`}
                                 title={`Paste data here to auto-fill multiple cells. Row ${rowIndex + 1}, Column: ${column}`}
                                 autoFocus={false}
@@ -932,7 +930,7 @@ export const DataTable = () => {
                             )
                           )
                         ) : (
-                          <span className="text-foreground">
+                          <span className="text-foreground text-xs md:text-sm">
                             {row[column] || '-'}
                           </span>
                         )}

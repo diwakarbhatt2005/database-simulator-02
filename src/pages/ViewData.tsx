@@ -7,8 +7,6 @@ import { DataTable } from '@/components/DataTable';
 import { useDashboardStore } from '@/store/dashboardStore';
 import { fetchTableData, ValidationError } from '@/api/tableData';
 
-import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
-import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import React, { useState, useEffect, useRef } from 'react';
 import { sendToWebhook } from '@/api/api4';
@@ -53,24 +51,6 @@ const ViewData = () => {
     };
     fetchData();
   }, [selectedDatabase, navigate, setTableData, setLoading, setError]);
-
-  // --- Month/Year State and Logic ---
-  const [selectedMonth, setSelectedMonth] = useState<string | null>(null);
-  const [selectedYear, setSelectedYear] = useState<string | null>(null);
-  const [showYearDialog, setShowYearDialog] = useState(false);
-
-  // Open year dialog when month is selected
-  useEffect(() => {
-    if (selectedMonth) setShowYearDialog(true);
-  }, [selectedMonth]);
-
-  // Example calculation handler
-  function handleCalculate(month: string, year: string) {
-    // TODO: Replace with your actual calculation logic
-    alert(`Calculating data for ${month}-${year}`);
-  }
-
-  // --- End Month/Year State and Logic ---
 
   // Floating Action Button and Chat Popup with text & voice input
   // --- ChatFab component moved above usage ---
@@ -260,68 +240,8 @@ const ViewData = () => {
         </div>
       </div>
 
-      {/* Calculate Month Data Section */}
-      <div className="max-w-7xl mx-auto px-6 pt-8 pb-2">
-        <div className="flex items-center gap-4">
-          <span className="font-semibold">Calculate Month Data:</span>
-          <Select onValueChange={(month) => setSelectedMonth(month)}>
-            <SelectTrigger className="w-40">
-              <SelectValue placeholder="Select Month" />
-            </SelectTrigger>
-            <SelectContent>
-              {["January","February","March","April","May","June","July","August","September","October","November","December"].map((m, idx) => (
-                <SelectItem key={m} value={String(idx+1).padStart(2,'0')}>{m}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Dialog open={showYearDialog} onOpenChange={setShowYearDialog}>
-            <DialogTrigger asChild>
-              <div />
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Select Year</DialogTitle>
-              </DialogHeader>
-              <div className="flex flex-col gap-4 mt-2">
-                <select
-                  className="border rounded px-3 py-2 text-base"
-                  value={selectedYear || ''}
-                  onChange={e => setSelectedYear(e.target.value)}
-                >
-                  <option value="" disabled>Select year</option>
-                  {Array.from({length: (new Date().getFullYear() - 2020 + 1)}, (_,i) => 2020 + i).map(y => (
-                    <option key={y} value={y}>{y}</option>
-                  ))}
-                </select>
-                <DialogFooter>
-                  <Button
-                    onClick={() => {
-                      setShowYearDialog(false);
-                      if (selectedMonth && selectedYear) {
-                        handleCalculate(selectedMonth, selectedYear);
-                      }
-                    }}
-                    disabled={!selectedYear}
-                  >
-                    Calculate
-                  </Button>
-                </DialogFooter>
-              </div>
-            </DialogContent>
-          </Dialog>
-          {/* Test Calculation Button */}
-          <Button
-            variant="outline"
-            onClick={() => alert('Test calculation triggered!')}
-            className="ml-2"
-          >
-            Test Calculation
-          </Button>
-        </div>
-      </div>
-
       {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-6 py-8">
+      <div className="w-full px-6 py-8">
         <DataTable />
       </div>
 
