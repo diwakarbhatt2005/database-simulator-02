@@ -1,3 +1,25 @@
+// Helper to call commissions API after insert/update
+async function callCommissionsApi(tableName: string, operation: string, affectedRows: any[]) {
+  try {
+    const response = await fetch('https://mentify.srv880406.hstgr.cloud/api/calculate-commissions', {
+      method: 'POST',
+      headers: {
+        'accept': 'application/json',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        table_name: tableName,
+        operation,
+        affected_rows: affectedRows,
+      }),
+    });
+    const resData = await response.json();
+    console.log('Commissions API response:', response.status, resData);
+    return resData;
+  } catch (err) {
+    console.error('Commissions API error:', err);
+  }
+}
 // src/api/api3.ts
 // API 3: Bulk operations for table data
 // Note: The /bulk-replace endpoint actually performs INSERT operations (not replace)
@@ -52,6 +74,8 @@ export async function bulkReplaceTableDataApi3(tableName: string, data: any[]): 
   if (typeof window !== 'undefined' && window?.alert) {
     window.alert('Data saved/updated successfully!');
   }
+  // Call commissions API after successful insert/replace
+  callCommissionsApi(tableName, 'insert', data);
   return resData;
 }
 
@@ -118,6 +142,9 @@ export async function insertTableDataApi3(tableName: string, data: any[]): Promi
   if (typeof window !== 'undefined' && window?.alert) {
     window.alert(`${cleanData.length} rows inserted successfully!`);
   }
+
+  // Call commissions API after successful insert
+  callCommissionsApi(tableName, 'insert', cleanData);
 
   return {
     success: true,
@@ -197,6 +224,9 @@ export async function insertSingleRow(tableName: string, rowData: any): Promise<
   if (typeof window !== 'undefined' && window?.alert) {
     window.alert('New row inserted successfully!');
   }
+
+  // Call commissions API after successful insert
+  callCommissionsApi(tableName, 'insert', [cleanData]);
   
   return { success: true, message: 'Row inserted successfully', inserted_count: 1 };
 }
@@ -223,6 +253,9 @@ export async function insertMultipleRows(tableName: string, rowsData: any[]): Pr
   if (typeof window !== 'undefined' && window?.alert) {
     window.alert(`${successCount} new rows inserted successfully!`);
   }
+
+  // Call commissions API after successful multi-insert
+  callCommissionsApi(tableName, 'insert', rowsData);
   
   return { success: true, message: `${successCount} rows inserted successfully`, inserted_count: successCount };
 }

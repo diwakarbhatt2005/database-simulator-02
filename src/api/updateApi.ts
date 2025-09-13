@@ -113,5 +113,25 @@ export async function updateTableDataApi(
   }
 
   // Success
+  // Call commissions API after successful update
+  try {
+    // Use the cleaned array as affected_rows
+    const commissionsRes = await fetch('https://mentify.srv880406.hstgr.cloud/api/calculate-commissions', {
+      method: 'POST',
+      headers: {
+        'accept': 'application/json',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        table_name: tableName,
+        operation: 'update',
+        affected_rows: cleaned,
+      }),
+    });
+    const commissionsData = await commissionsRes.json();
+    console.log('Commissions API response:', commissionsRes.status, commissionsData);
+  } catch (err) {
+    console.error('Commissions API error:', err);
+  }
   return resData as UpdateResponse;
 }
