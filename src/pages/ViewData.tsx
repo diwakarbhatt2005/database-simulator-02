@@ -241,7 +241,7 @@ const ViewData = () => {
       </div>
 
       {/* Main Content */}
-      <div className="w-full px-6 py-8">
+      <div className="w-full px-4 py-6">
         <DataTable />
       </div>
 

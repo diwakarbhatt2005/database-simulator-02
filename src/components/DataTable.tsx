@@ -801,14 +801,14 @@ export const DataTable = () => {
       )}
 
       {/* Data Table */}
-  <Card className="bg-gradient-card shadow-card border-0">
+      <Card className="bg-gradient-card shadow-card border-0 w-full">
         <CardContent className="p-0">
           <div
-            className="relative custom-table-scroll px-4 py-3"
+            className="relative custom-table-scroll"
             style={{
               width: '100%',
-              maxHeight: '600px',
-              minHeight: '400px',
+              maxHeight: '70vh',
+              minHeight: '500px',
               overflowX: 'auto',
               overflowY: 'auto',
               borderRadius: '10px',
@@ -817,14 +817,25 @@ export const DataTable = () => {
               background: 'white',
             }}
           >
-            <table className="w-full border-separate border-spacing-0 text-xs md:text-sm" style={{ minWidth: '800px' }}>
-              <thead className="sticky top-0 bg-table-header text-white z-10 shadow-md">
+            <table className="w-full border-collapse text-sm" style={{ minWidth: '100%' }}>
+              <thead className="sticky top-0 bg-gradient-to-r from-blue-600 to-blue-700 text-white z-10 shadow-lg">
                 <tr>
                   {isEditMode && (
-                    <th className="px-2 py-1 md:px-3 md:py-2 text-left font-medium bg-table-header sticky left-0 z-20 border-b border-table-border min-w-[100px]">Actions</th>
+                    <th className="px-4 py-4 text-left font-semibold sticky left-0 z-20 border-b-2 border-blue-800 min-w-[120px] bg-gradient-to-r from-blue-600 to-blue-700">
+                      Actions
+                    </th>
                   )}
                   {columns.map((column, index) => (
-                    <th key={column} className={`px-2 py-1 md:px-3 md:py-2 text-left font-medium min-w-[150px] bg-table-header border-b border-table-border ${index === 0 && !isEditMode ? 'sticky left-0 z-20' : ''}`}>
+                    <th 
+                      key={column} 
+                      className={`px-4 py-4 text-left font-semibold border-b-2 border-blue-800 bg-gradient-to-r from-blue-600 to-blue-700 ${
+                        index === 0 && !isEditMode ? 'sticky left-0 z-20 min-w-[180px]' : 'min-w-[160px]'
+                      }`}
+                      style={{ 
+                        width: index === 0 ? '15%' : `${85 / (columns.length - 1)}%`,
+                        maxWidth: index === 0 ? '200px' : 'none'
+                      }}
+                    >
                       {isEditMode ? (
                         <div className="flex items-center space-x-2">
                           {editingColumn === column ? (
@@ -840,20 +851,22 @@ export const DataTable = () => {
                                     setNewColumnName('');
                                   }
                                 }}
-                                className="h-7 md:h-8 text-xs md:text-sm text-black"
+                                className="h-8 text-sm text-black bg-white border-white"
                                 autoFocus
                               />
                               <Button
                                 size="sm"
                                 onClick={() => handleColumnRename(column, newColumnName)}
-                                className="h-6 w-6 p-0"
+                                className="h-7 w-7 p-0 bg-white text-blue-600 hover:bg-blue-50"
                               >
                                 <Save className="w-3 h-3" />
                               </Button>
                             </div>
                           ) : (
                             <>
-                              <span>{column.replace('_', ' ').toUpperCase()}</span>
+                              <span className="text-white font-semibold">
+                                {column.replace(/_/g, ' ').toUpperCase()}
+                              </span>
                               <Button
                                 size="sm"
                                 variant="ghost"
@@ -861,7 +874,7 @@ export const DataTable = () => {
                                   setEditingColumn(column);
                                   setNewColumnName(column);
                                 }}
-                                className="h-6 w-6 p-0 text-white hover:bg-white/20"
+                                className="h-7 w-7 p-0 text-white hover:bg-white/20 rounded"
                               >
                                 <Edit3 className="w-3 h-3" />
                               </Button>
@@ -869,7 +882,9 @@ export const DataTable = () => {
                           )}
                         </div>
                       ) : (
-                        column.replace('_', ' ').toUpperCase()
+                        <span className="text-white font-semibold">
+                          {column.replace(/_/g, ' ').toUpperCase()}
+                        </span>
                       )}
                     </th>
                   ))}
@@ -879,16 +894,18 @@ export const DataTable = () => {
                 {tableData.map((row, rowIndex) => (
                   <tr 
                     key={rowIndex}
-                    className={`border-b border-table-border hover:bg-table-row-hover transition-smooth ${mode === 'insert' && rowIndex < originalDataLength ? 'pointer-events-none select-none' : ''}`}
+                    className={`border-b border-gray-200 hover:bg-blue-50 transition-all duration-200 ${
+                      mode === 'insert' && rowIndex < originalDataLength ? 'pointer-events-none select-none bg-gray-50' : 'bg-white'
+                    } ${rowIndex % 2 === 0 ? 'bg-gray-50/30' : 'bg-white'}`}
                   >
                     {isEditMode && (
-                      <td className="px-2 py-1 md:px-3 md:py-2 sticky left-0 bg-background z-15 border-r border-table-border">
+                      <td className="px-4 py-3 sticky left-0 bg-inherit z-15 border-r border-gray-200">
                         {rowIndex >= originalDataLength && (
                           <Button
                             onClick={() => deleteRow(rowIndex)}
                             size="sm"
                             variant="outline"
-                            className="border-destructive text-destructive hover:bg-destructive hover:text-white transition-smooth h-8 w-8 p-0"
+                            className="border-red-300 text-red-600 hover:bg-red-500 hover:text-white transition-all duration-200 h-8 w-8 p-0 rounded"
                           >
                             <Trash2 className="w-3 h-3" />
                           </Button>
@@ -896,7 +913,16 @@ export const DataTable = () => {
                       </td>
                     )}
                     {columns.map((column, colIndex) => (
-                      <td key={`${rowIndex}-${column}`} className={`px-2 py-1 md:px-3 md:py-2 border-r border-table-border min-w-[150px] ${colIndex === 0 && !isEditMode ? 'sticky left-0 bg-background z-15' : ''}`}>
+                      <td 
+                        key={`${rowIndex}-${column}`} 
+                        className={`px-4 py-3 border-r border-gray-200 ${
+                          colIndex === 0 && !isEditMode ? 'sticky left-0 bg-inherit z-15 font-medium' : ''
+                        }`}
+                        style={{ 
+                          width: colIndex === 0 ? '15%' : `${85 / (columns.length - 1)}%`,
+                          maxWidth: colIndex === 0 ? '200px' : 'none'
+                        }}
+                      >
                         {isEditMode ? (
                           // In Update mode, prevent editing the first column (primary key)
                           columns[0] === column && mode === 'update' ? (
@@ -904,7 +930,7 @@ export const DataTable = () => {
                               value={row[column] || ''}
                               readOnly
                               disabled
-                              className="border-input bg-gray-100 text-xs md:text-sm h-8"
+                              className="border-gray-300 bg-gray-100 text-sm h-9 w-full"
                               title={`Primary key is locked in Update mode`}
                             />
                           ) : (
@@ -914,7 +940,7 @@ export const DataTable = () => {
                                 value={row[column] || ''}
                                 readOnly
                                 disabled
-                                className="border-input bg-gray-100 text-xs md:text-sm h-8"
+                                className="border-gray-300 bg-gray-100 text-sm h-9 w-full"
                                 title={`Original rows are locked while adding new rows`}
                               />
                             ) : (
@@ -922,7 +948,7 @@ export const DataTable = () => {
                                 value={row[column] || ''}
                                 onChange={(e) => handleCellChange(rowIndex, column, e.target.value)}
                                 onPaste={(e) => handlePaste(e, rowIndex, column)}
-                                className="border-input focus:border-primary transition-smooth text-xs md:text-sm h-8"
+                                className="border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all duration-200 text-sm h-9 w-full"
                                 placeholder={`Enter ${column}`}
                                 title={`Paste data here to auto-fill multiple cells. Row ${rowIndex + 1}, Column: ${column}`}
                                 autoFocus={false}
@@ -930,7 +956,7 @@ export const DataTable = () => {
                             )
                           )
                         ) : (
-                          <span className="text-foreground text-xs md:text-sm">
+                          <span className="text-gray-800 text-sm leading-relaxed">
                             {row[column] || '-'}
                           </span>
                         )}
@@ -942,8 +968,8 @@ export const DataTable = () => {
             </table>
           </div>
           {isEditMode && (
-            <div className="p-2 md:p-4 border-t border-table-border bg-muted/30">
-              <p className="text-xs md:text-sm text-muted-foreground">
+            <div className="p-4 border-t border-gray-200 bg-blue-50/50">
+              <p className="text-sm text-gray-600 leading-relaxed">
                 💡 <strong>Copy-Paste Tip:</strong> Copy data from Excel/Sheets and paste in any cell. 
                 Data will auto-expand to fill rows and columns. New rows will be created automatically if needed.
               </p>
